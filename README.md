@@ -4,14 +4,6 @@
 
 The Rotor Manager is an internal component of the Ground Station software pipeline. It is responsible for sending positioning commands to an AlfaSpid RAS1 azimuth/elevation rotator via the Rot2Prog binary serial protocol, allowing the ground station antenna to physically track a satellite pass.
 
-```
-Station Manager
-      |
-      |-- set_position(az, el) -->  Rotor Manager  --  Rot2Prog packet  -->  AlfaSpid Rotator
-      |-- stop()               -->  Rotor Manager
-      |-- request_status()     -->  Rotor Manager  <--  status response  --  AlfaSpid Rotator
-```
-
 ## Dependencies
 
 - Python 3
