@@ -1,26 +1,44 @@
-# GRS Rotor Manager
+<h1 align="center">
+    GRS Rotor Manager
+    <br>
+</h1>
+
+<h4 align="center">Antenna Rotor Manager of the SpaceLab's Ground Station.</h4>
+
+<p align="center">
+    <a href="https://github.com/spacelab-ufsc/grs-rotor-manager">
+        <img src="https://img.shields.io/badge/status-development-green?style=for-the-badge">
+    </a>
+    <a href="https://github.com/spacelab-ufsc/grs-rotor-manager/releases">
+        <img alt="GitHub commits since latest release (by date)" src="https://img.shields.io/github/commits-since/spacelab-ufsc/grs-rotor-manager/latest?style=for-the-badge">
+    </a>
+    <a href="https://github.com/spacelab-ufsc/grs-rotor-manager/blob/main/LICENSE">
+        <img src="https://img.shields.io/badge/license-GPL3-yellow?style=for-the-badge">
+    </a>
+</p>
+
+<p align="center">
+    <a href="#overview">Overview</a> •
+    <a href="#dependencies">Dependencies</a> •
+    <a href="#usage">Usage</a> •
+    <a href="#testing">Testing</a> •
+    <a href="#documentation">Documentation</a> •
+    <a href="#license">License</a>
+</p>
 
 ## Overview
 
-The Rotor Manager is an internal component of the Ground Station software pipeline. It is responsible for sending positioning commands to an AlfaSpid RAS1 azimuth/elevation rotator via the Rot2Prog binary serial protocol, allowing the ground station antenna to physically track a satellite pass.
-
-```
-Station Manager
-      |
-      |-- set_position(az, el) -->  Rotor Manager  --  Rot2Prog packet  -->  AlfaSpid Rotator
-      |-- stop()               -->  Rotor Manager
-      |-- request_status()     -->  Rotor Manager  <--  status response  --  AlfaSpid Rotator
-```
+The GRS Rotor Manager is an internal component of SpaceLab's Ground Station software pipeline. It is responsible for sending positioning commands to an AlfaSpid RAS-2 azimuth/elevation rotator via the Rot2Prog binary serial protocol, allowing the ground station antenna to physically track a satellite pass.
 
 ## Dependencies
 
-- Python 3
-- `pyzmq`
+* [pyzmq](https://pypi.org/project/pyzmq/)
 
-## Files
+### Installation
 
-- `rotor_manager.py` — the `RotorManager` class, intended to be used by the Station Manager.
-- `rotor_simulator.py` — a standalone simulator that mimics the AlfaSpid rotator, for testing without hardware.
+```
+pip install pyzmq
+```
 
 ## Usage
 
@@ -38,9 +56,9 @@ manager.stop()
 manager.close()
 ```
 
-## ZMQ Interface
+### ZMQ Interface
 
-### Commands sent (to rotator / simulator)
+Commands sent (to rotator):
 
 | Method | Description |
 |---|---|
@@ -48,19 +66,17 @@ manager.close()
 | `stop()` | Commands the rotator to stop immediately and hold its current position |
 | `request_status()` | Requests the current azimuth and elevation from the rotator |
 
-Commands are sent over a ZMQ **PUSH** socket. The address of the rotator (or simulator) is passed to the constructor.
+Commands are sent over a ZMQ **PUSH** socket. The rotator address is passed to the constructor, keeping the component decoupled from any hardcoded addresses.
 
-### Status responses received (from rotator / simulator)
+Status responses are received over a ZMQ **SUB** socket subscribed to the `status` topic. The payload is two packed 32-bit floats: `(azimuth, elevation)`.
 
-Status responses are received over a ZMQ **SUB** socket on port `5560`, subscribed to the `status` topic. The payload is two packed 32-bit floats: `(azimuth, elevation)`.
+### Rot2Prog Protocol
 
-## Rot2Prog Protocol
-
-Commands are encoded as 11-byte binary packets following the Rot2Prog protocol used by the AlfaSpid Rot2Prog controller:
+Commands are encoded as 11-byte binary packets following the Rot2Prog protocol used by the AlfaSpid controller:
 
 | Byte | Content |
 |------|---------|
-| 1 | `0x57` — START byte ('W') |
+| 1 | `0x57` — START byte |
 | 2 | Azimuth high byte |
 | 3 | Azimuth low byte |
 | 4 | Azimuth pulse high byte |
@@ -69,52 +85,42 @@ Commands are encoded as 11-byte binary packets following the Rot2Prog protocol u
 | 7 | Elevation low byte |
 | 8 | Elevation pulse high byte |
 | 9 | Elevation pulse low byte |
-| 10 | Command byte (`0x0F` stop / `0x1F` status / `0x2F` set) |
-| 11 | `0x20` — END byte (space) |
+| 10 | Command byte |
+| 11 | `0x20` — END byte |
 
-Angles are encoded with a +360° offset to avoid negative values, so 0° azimuth is transmitted as 360 in the packet. The pulse bytes are fixed at `0x01, 0x00` corresponding to 1 degree resolution as per the Rot2Prog transmission setting.
+Angles are encoded with a +360° offset to avoid negative values. The pulse bytes are fixed at `0x01, 0x00`, corresponding to 1° resolution as per the Rot2Prog transmission setting.
 
-The rotator must be set to **CPU (Auto) mode** on the front panel for it to respond to software commands. Refer to the AlfaSpid Rot2Prog hardware manual for instructions on switching modes.
-
-## Running the Simulator
-
-The simulator mimics the AlfaSpid rotator and is useful for testing the full pipeline without hardware. Run it standalone:
-
-```bash
-python rotor_simulator.py
-```
-
-It will bind on port `5559` for incoming commands and publish status responses on port `5560`.
+> **Note:** The rotator must be set to **CPU (Auto) mode** on the front panel for it to respond to software commands. Refer to the AlfaSpid Rot2Prog hardware manual for instructions on switching modes.
 
 ## Testing
 
-With the simulator running in one terminal, run the provided test script in another:
+A standalone simulator is included that mimics the AlfaSpid rotator, useful for testing the full pipeline without hardware. Run it in one terminal:
 
-```bash
+```
+python rotor_simulator.py
+```
+
+Then run the provided test script in another terminal:
+
+```
 python test_rotor.py
 ```
 
-Expected simulator output:
+## Documentation
+
+The documentation of this project is generated using the Sphinx tool, and it is available [here](https://spacelab-ufsc.github.io/grs-rotor-manager/).
+
+### Dependencies
+
+* Sphinx
+* sphinx-rtd-theme
+
+### Building the Documentation
+
 ```
-[Simulator] Running, waiting for commands...
-[Simulator] SET POSITION -> Azimuth: 180.0°  Elevation: 45.0°
-[Simulator] STATUS request -> Responding with AZ: 180.0°  Elevation: 45.0°
-[Simulator] SET POSITION -> Azimuth: 200.0°  Elevation: 60.0°
-[Simulator] STOP received. Holding at AZ: 200.0°  Elevation: 60.0°
-[Simulator] STATUS request -> Responding with AZ: 200.0°  Elevation: 60.0°
+make html
 ```
 
-Expected manager output:
-```
-[Manager] Set position -> AZ: 180.0°  EL: 45.0°
-[Manager] Status response -> AZ: 180.0°  EL: 45.0°
-[Manager] Set position -> AZ: 200.0°  EL: 60.0°
-[Manager] Stop command sent
-[Manager] Status response -> AZ: 200.0°  EL: 60.0°
-```
+## License
 
-## Notes
-
-- The `RotorManager` constructor takes the rotator address as a parameter, keeping it decoupled from any hardcoded addresses. Pass `"tcp://localhost:5559"` when using the simulator, or the actual serial-to-IP bridge address when using real hardware.
-- ZMQ PUB/SUB has a slow joiner issue at startup where the first messages may be dropped before subscriptions are established. The test script uses `time.sleep()` between commands to avoid this. In production, the Station Manager should account for this with a brief startup delay.
-- The simulator does not model real rotator movement speed or inertia — it updates its internal position instantly upon receiving a SET command. A more realistic simulation would interpolate the position over time based on the rotation speeds in the hardware manual (120 sec/360° at 12V, 60 sec/360° at 24V).
+This project is licensed under GPLv3 license.
